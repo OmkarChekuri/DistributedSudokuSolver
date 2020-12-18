@@ -324,10 +324,10 @@ def client1serve():
     channelServer = grpc.insecure_channel('server:50051', options=(('grpc.enable_http_proxy', 0),))
     stubToServer = sudoku_pb2_grpc.SecureMessagingStub(channelServer)
     print(source  +" requesting public key from " + destination)
-    response = stubToServer.GetPublicKey(sudoku_pb2.NullMsg(status= 1 ))
+    responsePK = stubToServer.GetPublicKey(sudoku_pb2.NullMsg(status= 1 ))
 
-    n = response.n
-    e = response.e
+    n = responsePK.n
+    e = responsePK.e
     
     encryptedMessage = encrypt(n,e,source)
     
@@ -376,6 +376,7 @@ def client1serve():
                 hasToken = False
 
             if hasToken:
+                print("token value:",tokenValue)
                 responseFromClient2 = stubToClient2.GetSubMatrix(sudoku_pb2.Address(position= source ))
                 print(responseFromClient2.dst, "requested", responseFromClient2.src)
                 c2row0 = responseFromClient2.subrow0[:]
@@ -468,9 +469,9 @@ def client2serve():
     channelServer = grpc.insecure_channel('server:50051', options=(('grpc.enable_http_proxy', 0),))
     stubToServer = sudoku_pb2_grpc.SecureMessagingStub(channelServer)
     print(source  +" requesting public key from " + destination)
-    response = stubToServer.GetPublicKey(sudoku_pb2.NullMsg(status= 1 ))
-    n = response.n
-    e = response.e
+    responsePK  = stubToServer.GetPublicKey(sudoku_pb2.NullMsg(status= 1 ))
+    n = responsePK.n
+    e = responsePK.e
 
     encryptedMessage = encrypt(n,e,source)
     
@@ -518,6 +519,7 @@ def client2serve():
                 hasToken = False
 
             if hasToken:
+                print("token value:",tokenValue)
                 #print(type(response.subrow0[:]) )
                 responseFromClient1 = stubToClient1.GetSubMatrix(sudoku_pb2.Address(position= source ))
                 print(responseFromClient1.dst, "requested", responseFromClient1.src)
@@ -610,9 +612,9 @@ def client3serve():
     channelServer = grpc.insecure_channel('server:50051', options=(('grpc.enable_http_proxy', 0),))
     stubToServer = sudoku_pb2_grpc.SecureMessagingStub(channelServer)
     print(source  +" requesting public key from " + destination)
-    response = stubToServer.GetPublicKey(sudoku_pb2.NullMsg(status= 1 ))
-    n = response.n
-    e = response.e
+    responsePK  = stubToServer.GetPublicKey(sudoku_pb2.NullMsg(status= 1 ))
+    n = responsePK.n
+    e = responsePK.e
 
     encryptedMessage = encrypt(n,e,source)
     
@@ -656,6 +658,7 @@ def client3serve():
                 hasToken = False
 
             if hasToken:
+                print("token value:",tokenValue)
                 #print(type(response.subrow0[:]) )
                 responseFromClient2 = stubToClient2.GetSubMatrix(sudoku_pb2.Address(position= source ))
                 print(responseFromClient2.dst, "requested", responseFromClient2.src)
@@ -744,9 +747,9 @@ def client4serve():
     channelServer = grpc.insecure_channel('server:50051', options=(('grpc.enable_http_proxy', 0),))
     stubToServer = sudoku_pb2_grpc.SecureMessagingStub(channelServer)
     print(source  +" requesting public key from " + destination)
-    response = stubToServer.GetPublicKey(sudoku_pb2.NullMsg(status= 1 ))
-    n = response.n
-    e = response.e
+    responsePK  = stubToServer.GetPublicKey(sudoku_pb2.NullMsg(status= 1 ))
+    n = responsePK.n
+    e = responsePK.e
 
     encryptedMessage = encrypt(n,e,source)
     
@@ -792,6 +795,7 @@ def client4serve():
                 hasToken = False
 
             if hasToken:
+                print("token value:",tokenValue)
                 #print(type(response.subrow0[:]) )
                 responseFromClient1 = stubToClient1.GetSubMatrix(sudoku_pb2.Address(position= source ))
                 print(responseFromClient1.dst, "requested", responseFromClient1.src)
@@ -896,9 +900,9 @@ def client5serve():
     channelServer = grpc.insecure_channel('server:50051', options=(('grpc.enable_http_proxy', 0),))
     stubToServer = sudoku_pb2_grpc.SecureMessagingStub(channelServer)
     print(source  +" requesting public key from " + destination)
-    response = stubToServer.GetPublicKey(sudoku_pb2.NullMsg(status= 1 ))
-    n = response.n
-    e = response.e
+    responsePK  = stubToServer.GetPublicKey(sudoku_pb2.NullMsg(status= 1 ))
+    n = responsePK.n
+    e = responsePK.e
 
     encryptedMessage = encrypt(n,e,source)
     
@@ -952,6 +956,7 @@ def client5serve():
                 hasToken = False
 
             if hasToken:
+                print("token value:",tokenValue)
                 responseFromClient2 = stubToClient2.GetSubMatrix(sudoku_pb2.Address(position= source ))
                 print(responseFromClient2.dst, "requested", responseFromClient2.src)
                 c2row0 = responseFromClient2.subrow0[:]
@@ -1052,9 +1057,9 @@ def client6serve():
     channelServer = grpc.insecure_channel('server:50051', options=(('grpc.enable_http_proxy', 0),))
     stubToServer = sudoku_pb2_grpc.SecureMessagingStub(channelServer)
     print(source  +" requesting public key from " + destination)
-    response = stubToServer.GetPublicKey(sudoku_pb2.NullMsg(status= 1 ))
-    n = response.n
-    e = response.e
+    responsePK  = stubToServer.GetPublicKey(sudoku_pb2.NullMsg(status= 1 ))
+    n = responsePK.n
+    e = responsePK.e
 
     encryptedMessage = encrypt(n,e,source)
     
@@ -1101,6 +1106,7 @@ def client6serve():
                 hasToken = False
 
             if hasToken:
+                print("token value:",tokenValue)
                 #print(type(response.subrow0[:]) )
                 responseFromClient3 = stubToClient3.GetSubMatrix(sudoku_pb2.Address(position= source ))
                 print(responseFromClient3.dst, "requested", responseFromClient3.src)
@@ -1201,9 +1207,9 @@ def client7serve():
     channelServer = grpc.insecure_channel('server:50051', options=(('grpc.enable_http_proxy', 0),))
     stubToServer = sudoku_pb2_grpc.SecureMessagingStub(channelServer)
     print(source  +" requesting public key from " + destination)
-    response = stubToServer.GetPublicKey(sudoku_pb2.NullMsg(status= 1 ))
-    n = response.n
-    e = response.e
+    responsePK  = stubToServer.GetPublicKey(sudoku_pb2.NullMsg(status= 1 ))
+    n = responsePK.n
+    e = responsePK.e
 
     encryptedMessage = encrypt(n,e,source)
     
@@ -1249,6 +1255,7 @@ def client7serve():
                 hasToken = False
 
             if hasToken:
+                print("token value:",tokenValue)
                 responseFromClient4 = stubToClient4.GetSubMatrix(sudoku_pb2.Address(position= source))
                 print(responseFromClient4.dst, "requested", responseFromClient4.src)
                 c4row0 = responseFromClient4.subrow0[:]
@@ -1335,9 +1342,9 @@ def client8serve():
     channelServer = grpc.insecure_channel('server:50051', options=(('grpc.enable_http_proxy', 0),))
     stubToServer = sudoku_pb2_grpc.SecureMessagingStub(channelServer)
     print(source  +" requesting public key from " + destination)
-    response = stubToServer.GetPublicKey(sudoku_pb2.NullMsg(status= 1 ))
-    n = response.n
-    e = response.e
+    responsePK  = stubToServer.GetPublicKey(sudoku_pb2.NullMsg(status= 1 ))
+    n = responsePK.n
+    e = responsePK.e
 
     encryptedMessage = encrypt(n,e,source)
     
@@ -1385,6 +1392,7 @@ def client8serve():
                 hasToken = False
 
             if hasToken:
+                print("token value:",tokenValue)
                 #print(type(response.subrow0[:]) )
               
                
@@ -1472,9 +1480,9 @@ def client9serve():
     #starting its ownserver
     client9 = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     sudoku_pb2_grpc.add_SecureMessagingServicer_to_server(SecureMessagingClient1(), client9)
-    client9.add_insecure_port('[::]:50056')
+    client9.add_insecure_port('[::]:50060')
     client9.start()
-    print("client 9 sleeping")
+    #print("client 9 sleeping")
    #time.sleep(0)(1)
 
 
@@ -1483,9 +1491,9 @@ def client9serve():
     channelServer = grpc.insecure_channel('server:50051', options=(('grpc.enable_http_proxy', 0),))
     stubToServer = sudoku_pb2_grpc.SecureMessagingStub(channelServer)
     print(source  +" requesting public key from " + destination)
-    response = stubToServer.GetPublicKey(sudoku_pb2.NullMsg(status= 1 ))
-    n = response.n
-    e = response.e
+    responsePK  = stubToServer.GetPublicKey(sudoku_pb2.NullMsg(status= 1 ))
+    n = responsePK.n
+    e = responsePK.e
 
     encryptedMessage = encrypt(n,e,source)
     
@@ -1532,6 +1540,7 @@ def client9serve():
                 hasToken = False
 
             if hasToken:
+                print("token value:",tokenValue)
                
                 responseFromClient6 = stubToClient6.GetSubMatrix(sudoku_pb2.Address(position= source ))
                 print(responseFromClient6.dst, "requested", responseFromClient6.src)
