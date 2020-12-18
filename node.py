@@ -10,7 +10,7 @@ import threading
 import socket
 import pandas as pd
 import multiprocessing
-sleepseconds = 3
+sleepseconds = 0
 
 #custom function to encrypt message
 '''
@@ -70,8 +70,10 @@ def serve():
     e_value = 5
     timeslotDict = {"client1":0, "client2":0, "client3":0, "client4":0, "client5":0, "client6":0, "client7":0, "client8":0, "client9":0}
 
+    #clients send their name as encripted message which is decrypted
     encriptedDictionary = {}
 
+    #sudoku
     board = [[0,1,0,0,8,0,0,2,4],
            [5,9,0,0,0,0,0,0,1],
            [0,2,4,1,0,3,5,7,0],
@@ -81,6 +83,13 @@ def serve():
            [0,5,9,4,0,2,1,8,0],
            [4,0,1,0,0,0,0,0,2],
            [0,6,0,0,1,0,0,4,0]]
+    
+    #client topology
+    neighbours =    {"client1":["client2","client4"], "client2":["client1","client3","client5"],"client3":["client2","client5"],
+    "client4":["client1","client5","client7"],"client5":["client2","client4","client6","client8"], "client6":["client3","client5","client9"],
+    "client7":["client4","client8"], "client8":["client5","client7","client9"],"client9":["client6","client8"]}
+
+    activeclients = []
 
     class SecureMessaging1(sudoku_pb2_grpc.SecureMessagingServicer):
         def GetPublicKey(self,request,context):
@@ -99,26 +108,48 @@ def serve():
             response.dst = request.dst
             #print(response.dst + " recieved " + request.message + " from " + response.src)
             print(request.dst + " recieved encrypted messsage " + request.message + " from " + request.src)
-            print("Server decrypted the messsage to " + decrypt(n_value,e_value,request.message))
+            message = decrypt(n_value,e_value,request.message)
+            print("Server decrypted the messsage to " + message)
             print(request.dst + " sent acknowledgement to " + request.src)
-            encriptedDictionary[request.src] = request.message
+            encriptedDictionary[request.src] = message
+            activeclients.append(message)
+            message =""
+
             
             return response
 
+        def isMyNeighboursActive(self,request,context):
+            
+            requester = request.position
+            response = sudoku_pb2.Neighbor()
+            if all(x in activeclients for x in neighbours[requester]):
+                response.N_list.extend(neighbours[requester])
+            else:
+                response.N_list.extend([])
+            
+            return response
+            
+
         def GetRoundRobinToken(self,request,context):
             #print(request)
-            if request.position != 0 :
+            if request.position in timeslotDict.keys() :
                 response = sudoku_pb2.Token()
-                if timeslotDict[request.position] > 0:
-                    response.timeslot = timeslotDict[request.position]
-                    timeslotDict[request.position] = response.timeslot -1
+                requester= request.position
+                #if it has already been assigned a valid token return it
+                if timeslotDict[requester] > 0:
+                    response.timeslot = timeslotDict[requester]
+                    print(requester , "-----token------ " ,response.timeslot )
+                    timeslotDict[requester] = response.timeslot -1
+                #if none of the clients have a valid token then create a valid token for thid client    
                 elif not(len([value for value in timeslotDict.values() if value >0])):
-                    timeslotDict[request.position] = 3
-                    response.timeslot = timeslotDict[request.position]
+                    timeslotDict[requester] = 6
+                    response.timeslot = 6
+                else:
+                    response.timeslot = 0
                 
                 #print(response.dst + " recieved " + request.message + " from " + response.src)
-                if response.timeslot > 0:
-                    print(request.position , "requested timeslot is " ,response.timeslot )
+                #if response.timeslot > 0:
+                    #print(request.position , "requested timeslot is " ,response.timeslot )
 
             
             return response
@@ -224,7 +255,8 @@ def serve():
     try:
         while True:
             #print("server running")
-            time.sleep(sleepseconds)
+            #time.sleep(sleepseconds)
+            pass
     except KeyboardInterrupt:
         print("keyboardinterrupt")
         server.stop(0)
@@ -266,7 +298,7 @@ def client1serve():
             if request.position == "client2" or "client4":
                 response.src = source
                 response.dst = request.position
-                print(response.src, "sending matrix to ", request.position)
+                #print(request.position, "requested matrix from ",response.src )
                 #subsudoku = pandas_board.iloc[0:3,0:3].values.tolist()
                 del response.subrow0[:]
                 del response.subrow1[:]
@@ -300,8 +332,8 @@ def client1serve():
     encryptedMessage = encrypt(n,e,source)
     
     print(source + " sending encrypted message " + encryptedMessage + " to " + destination)
-    for i in range(10):
-        newresponse = stubToServer.SendEncryptedMessage(sudoku_pb2.EncryptedMessage(message=encryptedMessage, src = source, dst = destination))
+    
+    newresponse = stubToServer.SendEncryptedMessage(sudoku_pb2.EncryptedMessage(message=encryptedMessage, src = source, dst = destination))
     if newresponse.status ==1 and newresponse.src == source and newresponse.dst == destination:
         print(source + " recieved acknoledgement from " +destination)
 
@@ -318,21 +350,19 @@ def client1serve():
     print(response.subrow2[:] )
 
     #print(type(response.subrow0[:]) )
+    
+    neighb_response = stubToServer.isMyNeighboursActive(sudoku_pb2.Address(position= source ))
 
-    try:
-
+    if not(neighb_response.N_list == []):
+        print("neighbours are",neighb_response.N_list)
+        
         #create a communication channel to client2 and client4 
         channelclient2 = grpc.insecure_channel('client2:50053', options=(('grpc.enable_http_proxy', 0),))
         stubToClient2 = sudoku_pb2_grpc.SecureMessagingStub(channelclient2)
 
         channelclient4 = grpc.insecure_channel('client4:50055', options=(('grpc.enable_http_proxy', 0),))
         stubToClient4 = sudoku_pb2_grpc.SecureMessagingStub(channelclient4)
-    except :
-        sleep(1)
-
-
-
-    try:
+    
         while unsolved :
 
             #request token from server
@@ -347,18 +377,24 @@ def client1serve():
 
             if hasToken:
                 responseFromClient2 = stubToClient2.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient2.dst, "recieving sub sudoku from", responseFromClient2.src)
+                print(responseFromClient2.dst, "requested", responseFromClient2.src)
                 c2row0 = responseFromClient2.subrow0[:]
                 c2row1 = responseFromClient2.subrow1[:]
                 c2row2 = responseFromClient2.subrow2[:]
                 print( "",c2row0,"\n",c2row1,"\n",c2row2)
 
                 responseFromClient4 = stubToClient4.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient4.dst, "recieving sub sudoku from", responseFromClient4.src)
+                print(responseFromClient4.dst, "requested", responseFromClient4.src)
                 c4row0 = responseFromClient4.subrow0[:]
                 c4row1 = responseFromClient4.subrow1[:]
                 c4row2 = responseFromClient4.subrow2[:]
                 print( "",c4row0,"\n",c4row1,"\n",c4row2)
+
+    try:
+        while True:
+            #print("server running")
+            #time.sleep(sleepseconds)
+            pass
 
     except KeyboardInterrupt:
         print("keyboardinterrupt")
@@ -406,7 +442,7 @@ def client2serve():
             if request.position == "client1" or "client3" or "client5" :
                 response.src = source
                 response.dst = request.position
-                print(response.src, "sending matrix to ", request.position)
+                #print(request.position, "requested matrix from ",response.src )
                 #subsudoku = pandas_board.iloc[0:3,0:3].values.tolist()
                 del response.subrow0[:]
                 del response.subrow1[:]
@@ -439,8 +475,7 @@ def client2serve():
     encryptedMessage = encrypt(n,e,source)
     
     print(source + " sending encrypted message " + encryptedMessage + " to " + destination)
-    for i in range(10):
-        newresponse = stubToServer.SendEncryptedMessage(sudoku_pb2.EncryptedMessage(message=encryptedMessage, src = source, dst = destination))
+    newresponse = stubToServer.SendEncryptedMessage(sudoku_pb2.EncryptedMessage(message=encryptedMessage, src = source, dst = destination))
     if newresponse.status ==1 and newresponse.src == source and newresponse.dst == destination:
         print(source + " recieved acknoledgement from " +destination)
     #initially requesting from server using stubToServer
@@ -455,8 +490,12 @@ def client2serve():
     print(response.subrow1[:] )
     print(response.subrow2[:] )
  
+    neighb_response = stubToServer.isMyNeighboursActive(sudoku_pb2.Address(position= source ))
 
-    try:
+    if not(neighb_response.N_list == []):
+        print("neighbours are",neighb_response.N_list)
+
+    
         #create a communication channel to client1
         channelToClient1 = grpc.insecure_channel('client1:50052', options=(('grpc.enable_http_proxy', 0),))
         stubToClient1= sudoku_pb2_grpc.SecureMessagingStub(channelToClient1)
@@ -466,12 +505,6 @@ def client2serve():
 
         channelToClient5 = grpc.insecure_channel('client5:50056', options=(('grpc.enable_http_proxy', 0),))
         stubToClient5= sudoku_pb2_grpc.SecureMessagingStub(channelToClient5)
-    except :
-        sleep(1)
-
-
-   
-    try:
 
         while unsolved:
 
@@ -487,27 +520,31 @@ def client2serve():
             if hasToken:
                 #print(type(response.subrow0[:]) )
                 responseFromClient1 = stubToClient1.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient1.dst, "recieving sub sudoku from", responseFromClient1.src)
+                print(responseFromClient1.dst, "requested", responseFromClient1.src)
                 c1row0 = responseFromClient1.subrow0[:]
                 c1row1 = responseFromClient1.subrow1[:]
                 c1row2 = responseFromClient1.subrow2[:]
                 print( "",c1row0,"\n",c1row1,"\n",c1row2)
 
                 responseFromClient3 = stubToClient3.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient3.dst, "recieving sub sudoku from", responseFromClient3.src)
+                print(responseFromClient3.dst, "requested", responseFromClient3.src)
                 c3row0 = responseFromClient3.subrow0[:]
                 c3row1 = responseFromClient3.subrow1[:]
                 c3row2 = responseFromClient3.subrow2[:]
                 print( "",c3row0,"\n",c3row1,"\n",c3row2)
                 
                 responseFromClient5 = stubToClient5.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient5.dst, "recieving sub sudoku from", responseFromClient5.src)
+                print(responseFromClient5.dst, "requested", responseFromClient5.src)
                 c5row0 = responseFromClient5.subrow0[:]
                 c5row1 = responseFromClient5.subrow1[:]
                 c5row2 = responseFromClient5.subrow2[:]
                 print( "",c5row0,"\n",c5row1,"\n",c5row2)
 
-
+    try:
+        while True:
+            #print("server running")
+            #time.sleep(sleepseconds)
+            pass
     except KeyboardInterrupt:
         print("keyboardinterrupt")
         exit()
@@ -548,7 +585,7 @@ def client3serve():
             if request.position == "client2" or "client6" :
                 response.src = source
                 response.dst = request.position
-                print(response.src, "sending matrix to ", request.position)
+                #print(request.position, "requested matrix from ",response.src )
                 #subsudoku = pandas_board.iloc[0:3,0:3].values.tolist()
                 del response.subrow0[:]
                 del response.subrow1[:]
@@ -580,8 +617,7 @@ def client3serve():
     encryptedMessage = encrypt(n,e,source)
     
     print(source + " sending encrypted message " + encryptedMessage + " to " + destination)
-    for i in range(10):
-        newresponse = stubToServer.SendEncryptedMessage(sudoku_pb2.EncryptedMessage(message=encryptedMessage, src = source, dst = destination))
+    newresponse = stubToServer.SendEncryptedMessage(sudoku_pb2.EncryptedMessage(message=encryptedMessage, src = source, dst = destination))
     if newresponse.status ==1 and newresponse.src == source and newresponse.dst == destination:
         print(source + " recieved acknoledgement from " +destination)
 
@@ -597,22 +633,17 @@ def client3serve():
     print(response.subrow1[:] )
     print(response.subrow2[:] )
  
+    neighb_response = stubToServer.isMyNeighboursActive(sudoku_pb2.Address(position= source ))
 
-    try:
+    if not(neighb_response.N_list == []):
+        print("neighbours are",neighb_response.N_list)
         #create a communication channel to client1
         channelToClient2 = grpc.insecure_channel('client2:50053', options=(('grpc.enable_http_proxy', 0),))
         stubToClient2= sudoku_pb2_grpc.SecureMessagingStub(channelToClient2)
 
         channelToClien6 = grpc.insecure_channel('client6:50057', options=(('grpc.enable_http_proxy', 0),))
         stubToClient6= sudoku_pb2_grpc.SecureMessagingStub(channelToClien6)
-    except :
-        sleep(1)
-
     
-
-
-    try:
-
         while unsolved:
 
             #request token from server
@@ -627,21 +658,25 @@ def client3serve():
             if hasToken:
                 #print(type(response.subrow0[:]) )
                 responseFromClient2 = stubToClient2.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient2.dst, "recieving sub sudoku from", responseFromClient2.src)
+                print(responseFromClient2.dst, "requested", responseFromClient2.src)
                 c2row0 = responseFromClient2.subrow0[:]
                 c2row1 = responseFromClient2.subrow1[:]
                 c2row2 = responseFromClient2.subrow2[:]
                 print( "",c2row0,"\n",c2row1,"\n",c2row2)
                 
-                responseFromClient6 = stubToClient3.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient6.dst, "recieving sub sudoku from", responseFromClient6.src)
+                responseFromClient6 = stubToClient6.GetSubMatrix(sudoku_pb2.Address(position= source ))
+                print(responseFromClient6.dst, "requested", responseFromClient6.src)
                 c6row0 = responseFromClient6.subrow0[:]
                 c6row1 = responseFromClient6.subrow1[:]
                 c6row2 = responseFromClient6.subrow2[:]
                 print( "",c6row0,"\n",c6row1,"\n",c6row2)
                 
 
-
+    try:
+        while True:
+            #print("server running")
+            #time.sleep(sleepseconds)
+            pass
 
     except KeyboardInterrupt:
         print("keyboardinterrupt")
@@ -685,7 +720,7 @@ def client4serve():
             if request.position == "client1" or "client5" or "client7" :
                 response.src = source
                 response.dst = request.position
-                print(response.src, "sending matrix to ", request.position)
+                #print(request.position, "requested matrix from ",response.src )
                 #subsudoku = pandas_board.iloc[0:3,0:3].values.tolist()
                 del response.subrow0[:]
                 del response.subrow1[:]
@@ -716,8 +751,7 @@ def client4serve():
     encryptedMessage = encrypt(n,e,source)
     
     print(source + " sending encrypted message " + encryptedMessage + " to " + destination)
-    for i in range(10):
-            newresponse = stubToServer.SendEncryptedMessage(sudoku_pb2.EncryptedMessage(message=encryptedMessage, src = source, dst = destination))
+    newresponse = stubToServer.SendEncryptedMessage(sudoku_pb2.EncryptedMessage(message=encryptedMessage, src = source, dst = destination))
     if newresponse.status ==1 and newresponse.src == source and newresponse.dst == destination:
             print(source + " recieved acknoledgement from " +destination)
     #initially requesting from server using stubToServer
@@ -731,8 +765,11 @@ def client4serve():
     print(response.subrow0[:] )
     print(response.subrow1[:] )
     print(response.subrow2[:] )
- 
-    try:
+
+    neighb_response = stubToServer.isMyNeighboursActive(sudoku_pb2.Address(position= source ))
+
+    if not(neighb_response.N_list == []):
+        print("neighbours are",neighb_response.N_list)
         #create a communication channel to client1
         channelToClient1 = grpc.insecure_channel('client1:50052', options=(('grpc.enable_http_proxy', 0),))
         stubToClient1= sudoku_pb2_grpc.SecureMessagingStub(channelToClient1)
@@ -742,14 +779,7 @@ def client4serve():
 
         channelToClient7 = grpc.insecure_channel('client7:50058', options=(('grpc.enable_http_proxy', 0),))
         stubToClient7 = sudoku_pb2_grpc.SecureMessagingStub(channelToClient7)
-    except :
-        sleep(1)
-
-    
-
-
-    try:
-
+ 
         while unsolved:
 
             #request token from server
@@ -764,7 +794,7 @@ def client4serve():
             if hasToken:
                 #print(type(response.subrow0[:]) )
                 responseFromClient1 = stubToClient1.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient1.dst, "recieving sub sudoku from", responseFromClient1.src)
+                print(responseFromClient1.dst, "requested", responseFromClient1.src)
                 c1row0 = responseFromClient1.subrow0[:]
                 c1row1 = responseFromClient1.subrow1[:]
                 c1row2 = responseFromClient1.subrow2[:]
@@ -772,21 +802,24 @@ def client4serve():
                 
                
                 responseFromClient5 = stubToClient5.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient5.dst, "recieving sub sudoku from", responseFromClient5.src)
+                print(responseFromClient5.dst, "requested", responseFromClient5.src)
                 c5row0 = responseFromClient5.subrow0[:]
                 c5row1 = responseFromClient5.subrow1[:]
                 c5row2 = responseFromClient5.subrow2[:]
                 print( "",c5row0,"\n",c5row1,"\n",c5row2)
 
                 responseFromClient7 = stubToClient7.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient7.dst, "recieving sub sudoku from", responseFromClient7.src)
+                print(responseFromClient7.dst, "requested", responseFromClient7.src)
                 c7row0 = responseFromClient7.subrow0[:]
                 c7row1 = responseFromClient7.subrow1[:]
                 c7row2 = responseFromClient7.subrow2[:]
                 print( "",c7row0,"\n",c7row1,"\n",c7row2)
                 
-
-
+    try:
+        while True:
+            #print("server running")
+            #time.sleep(sleepseconds)
+            pass
 
     except KeyboardInterrupt:
         print("keyboardinterrupt")
@@ -837,7 +870,7 @@ def client5serve():
             if request.position == "client2" or "client4" or "client6" or "client8" :
                 response.src = source
                 response.dst = request.position
-                print(response.src, "sending matrix to ", request.position)
+                #print(request.position, "requested matrix from ",response.src )
                 #subsudoku = pandas_board.iloc[0:3,0:3].values.tolist()
                 del response.subrow0[:]
                 del response.subrow1[:]
@@ -870,8 +903,7 @@ def client5serve():
     encryptedMessage = encrypt(n,e,source)
     
     print(source + " sending encrypted message " + encryptedMessage + " to " + destination)
-    for i in range(10):
-            newresponse = stubToServer.SendEncryptedMessage(sudoku_pb2.EncryptedMessage(message=encryptedMessage, src = source, dst = destination))
+    newresponse = stubToServer.SendEncryptedMessage(sudoku_pb2.EncryptedMessage(message=encryptedMessage, src = source, dst = destination))
     if newresponse.status ==1 and newresponse.src == source and newresponse.dst == destination:
             print(source + " recieved acknoledgement from " +destination)
     
@@ -889,8 +921,11 @@ def client5serve():
 
     #print(type(response.subrow0[:]) )
 
+    neighb_response = stubToServer.isMyNeighboursActive(sudoku_pb2.Address(position= source ))
 
-    try:
+    if not(neighb_response.N_list == []):
+        print("neighbours are",neighb_response.N_list)
+       
         #create a communication channel to client2
         channelclient2 = grpc.insecure_channel('client2:50053', options=(('grpc.enable_http_proxy', 0),))
         stubToClient2 = sudoku_pb2_grpc.SecureMessagingStub(channelclient2)
@@ -903,14 +938,7 @@ def client5serve():
 
         channelclient8 = grpc.insecure_channel('client8:50059', options=(('grpc.enable_http_proxy', 0),))
         stubToClient8 = sudoku_pb2_grpc.SecureMessagingStub(channelclient8)
-    except :
-        sleep(1)
 
-
-
-
-    
-    try:
         while unsolved :
 
             #request token from server
@@ -925,34 +953,38 @@ def client5serve():
 
             if hasToken:
                 responseFromClient2 = stubToClient2.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient2.dst, "recieving sub sudoku from", responseFromClient2.src)
+                print(responseFromClient2.dst, "requested", responseFromClient2.src)
                 c2row0 = responseFromClient2.subrow0[:]
                 c2row1 = responseFromClient2.subrow1[:]
                 c2row2 = responseFromClient2.subrow2[:]
                 print( "",c2row0,"\n",c2row1,"\n",c2row2)
 
                 responseFromClient4 = stubToClient4.GetSubMatrix(sudoku_pb2.Address(position= source))
-                print(responseFromClient4.dst, "recieving sub sudoku from", responseFromClient4.src)
+                print(responseFromClient4.dst, "requested", responseFromClient4.src)
                 c4row0 = responseFromClient4.subrow0[:]
                 c4row1 = responseFromClient4.subrow1[:]
                 c4row2 = responseFromClient4.subrow2[:]
                 print( "",c4row0,"\n",c4row1,"\n",c4row2)
 
                 responseFromClient6 = stubToClient6.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient6.dst, "recieving sub sudoku from", responseFromClient6.src)
+                print(responseFromClient6.dst, "requested", responseFromClient6.src)
                 c6row0 = responseFromClient6.subrow0[:]
                 c6row1 = responseFromClient6.subrow1[:]
                 c6row2 = responseFromClient6.subrow2[:]
                 print( "",c6row0,"\n",c6row1,"\n",c6row2)
 
                 responseFromClient8 = stubToClient8.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient8.dst, "recieving sub sudoku from", responseFromClient8.src)
+                print(responseFromClient8.dst, "requested", responseFromClient8.src)
                 c8row0 = responseFromClient8.subrow0[:]
                 c8row1 = responseFromClient8.subrow1[:]
                 c8row2 = responseFromClient8.subrow2[:]
                 print( "",c8row0,"\n",c8row1,"\n",c8row2)
 
-
+    try:
+        while True:
+            #print("server running")
+            #time.sleep(sleepseconds)
+            pass
 
     except KeyboardInterrupt:
         print("keyboardinterrupt")
@@ -996,7 +1028,7 @@ def client6serve():
             if request.position == "client3" or "client5" or "client9" :
                 response.src = source
                 response.dst = request.position
-                print(response.src, "sending matrix to ", request.position)
+                #print(request.position, "requested matrix from ",response.src )
                 #subsudoku = pandas_board.iloc[0:3,0:3].values.tolist()
                 del response.subrow0[:]
                 del response.subrow1[:]
@@ -1027,8 +1059,7 @@ def client6serve():
     encryptedMessage = encrypt(n,e,source)
     
     print(source + " sending encrypted message " + encryptedMessage + " to " + destination)
-    for i in range(10):
-            newresponse = stubToServer.SendEncryptedMessage(sudoku_pb2.EncryptedMessage(message=encryptedMessage, src = source, dst = destination))
+    newresponse = stubToServer.SendEncryptedMessage(sudoku_pb2.EncryptedMessage(message=encryptedMessage, src = source, dst = destination))
     if newresponse.status ==1 and newresponse.src == source and newresponse.dst == destination:
             print(source + " recieved acknoledgement from " +destination)
 
@@ -1044,8 +1075,11 @@ def client6serve():
     print(response.subrow1[:] )
     print(response.subrow2[:] )
  
+    neighb_response = stubToServer.isMyNeighboursActive(sudoku_pb2.Address(position= source ))
 
-    try:    
+    if not(neighb_response.N_list == []):
+        print("neighbours are",neighb_response.N_list)
+         
         #create a communication channel to client3 5 9
         channelToClient3 = grpc.insecure_channel('client3:50054', options=(('grpc.enable_http_proxy', 0),))
         stubToClient3= sudoku_pb2_grpc.SecureMessagingStub(channelToClient3)
@@ -1055,14 +1089,6 @@ def client6serve():
 
         channelclient9 = grpc.insecure_channel('client9:50060', options=(('grpc.enable_http_proxy', 0),))
         stubToClient9 = sudoku_pb2_grpc.SecureMessagingStub(channelclient9)
-    except :
-        sleep(1)
-    
-
-
-    
-    try:
-
         while unsolved:
 
             #request token from server
@@ -1077,28 +1103,32 @@ def client6serve():
             if hasToken:
                 #print(type(response.subrow0[:]) )
                 responseFromClient3 = stubToClient3.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient3.dst, "recieving sub sudoku from", responseFromClient3.src)
+                print(responseFromClient3.dst, "requested", responseFromClient3.src)
                 c3row0 = responseFromClient3.subrow0[:]
                 c3row1 = responseFromClient3.subrow1[:]
                 c3row2 = responseFromClient3.subrow2[:]
                 print( "",c3row0,"\n",c3row1,"\n",c3row2)
                 
                 responseFromClient5 = stubToClient5.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient5.dst, "recieving sub sudoku from", responseFromClient5.src)
+                print(responseFromClient5.dst, "requested", responseFromClient5.src)
                 c5row0 = responseFromClient5.subrow0[:]
                 c5row1 = responseFromClient5.subrow1[:]
                 c5row2 = responseFromClient5.subrow2[:]
                 print( "",c5row0,"\n",c5row1,"\n",c5row2)
 
                 responseFromClient9 = stubToClient9.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient9.dst, "recieving sub sudoku from", responseFromClient9.src)
+                print(responseFromClient9.dst, "requested", responseFromClient9.src)
                 c9row0 = responseFromClient9.subrow0[:]
                 c9row1 = responseFromClient9.subrow1[:]
                 c9row2 = responseFromClient9.subrow2[:]
                 print( "",c9row0,"\n",c9row1,"\n",c9row2)
                 
 
-
+    try:
+        while True:
+            #print("server running")
+            #time.sleep(sleepseconds)
+            pass
 
     except KeyboardInterrupt:
         print("keyboardinterrupt")
@@ -1143,7 +1173,7 @@ def client7serve():
             if request.position == "client4" or "client8" :
                 response.src = source
                 response.dst = request.position
-                print(response.src, "sending matrix to ", request.position)
+                #print(request.position, "requested matrix from ",response.src )
                 #subsudoku = pandas_board.iloc[0:3,0:3].values.tolist()
                 del response.subrow0[:]
                 del response.subrow1[:]
@@ -1178,8 +1208,7 @@ def client7serve():
     encryptedMessage = encrypt(n,e,source)
     
     print(source + " sending encrypted message " + encryptedMessage + " to " + destination)
-    for i in range(10):
-            newresponse = stubToServer.SendEncryptedMessage(sudoku_pb2.EncryptedMessage(message=encryptedMessage, src = source, dst = destination))
+    newresponse = stubToServer.SendEncryptedMessage(sudoku_pb2.EncryptedMessage(message=encryptedMessage, src = source, dst = destination))
     if newresponse.status ==1 and newresponse.src == source and newresponse.dst == destination:
             print(source + " recieved acknoledgement from " +destination)
     
@@ -1196,21 +1225,17 @@ def client7serve():
     print(response.subrow2[:] )
 
 
-    try:
-        #create a communication channel to client2
+    neighb_response = stubToServer.isMyNeighboursActive(sudoku_pb2.Address(position= source ))
+
+    if not(neighb_response.N_list == []):
+        print("neighbours are",neighb_response.N_list)
         
         channelclient4 = grpc.insecure_channel('client4:50055', options=(('grpc.enable_http_proxy', 0),))
         stubToClient4 = sudoku_pb2_grpc.SecureMessagingStub(channelclient4)
 
         channelclient8 = grpc.insecure_channel('client8:50059', options=(('grpc.enable_http_proxy', 0),))
         stubToClient8 = sudoku_pb2_grpc.SecureMessagingStub(channelclient8)
-    except :
-        sleep(1)
 
-
-
-
-    try:
         while unsolved :
 
             #request token from server
@@ -1225,20 +1250,24 @@ def client7serve():
 
             if hasToken:
                 responseFromClient4 = stubToClient4.GetSubMatrix(sudoku_pb2.Address(position= source))
-                print(responseFromClient4.dst, "recieving sub sudoku from", responseFromClient4.src)
+                print(responseFromClient4.dst, "requested", responseFromClient4.src)
                 c4row0 = responseFromClient4.subrow0[:]
                 c4row1 = responseFromClient4.subrow1[:]
                 c4row2 = responseFromClient4.subrow2[:]
                 print( "",c4row0,"\n",c4row1,"\n",c4row2)
 
                 responseFromClient8 = stubToClient8.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient8.dst, "recieving sub sudoku from", responseFromClient8.src)
+                print(responseFromClient8.dst, "requested", responseFromClient8.src)
                 c8row0 = responseFromClient8.subrow0[:]
                 c8row1 = responseFromClient8.subrow1[:]
                 c8row2 = responseFromClient8.subrow2[:]
                 print( "",c8row0,"\n",c8row1,"\n",c8row2)
 
-
+    try:
+        while True:
+            #print("server running")
+            #time.sleep(sleepseconds)
+            pass
     except KeyboardInterrupt:
         print("keyboardinterrupt")
         exit()
@@ -1281,7 +1310,7 @@ def client8serve():
             if request.position == "client9" or "client5" or "client7" :
                 response.src = source
                 response.dst = request.position
-                print(response.src, "sending matrix to ", request.position)
+                #print(request.position, "requested matrix from ",response.src )
                 #subsudoku = pandas_board.iloc[0:3,0:3].values.tolist()
                 del response.subrow0[:]
                 del response.subrow1[:]
@@ -1313,8 +1342,7 @@ def client8serve():
     encryptedMessage = encrypt(n,e,source)
     
     print(source + " sending encrypted message " + encryptedMessage + " to " + destination)
-    for i in range(10):
-            newresponse = stubToServer.SendEncryptedMessage(sudoku_pb2.EncryptedMessage(message=encryptedMessage, src = source, dst = destination))
+    newresponse = stubToServer.SendEncryptedMessage(sudoku_pb2.EncryptedMessage(message=encryptedMessage, src = source, dst = destination))
     if newresponse.status ==1 and newresponse.src == source and newresponse.dst == destination:
             print(source + " recieved acknoledgement from " +destination)
 
@@ -1333,9 +1361,10 @@ def client8serve():
 
     
     #create a communication channel to client1
+    neighb_response = stubToServer.isMyNeighboursActive(sudoku_pb2.Address(position= source ))
 
-    try:
-            
+    if not(neighb_response.N_list == []):
+        print("neighbours are",neighb_response.N_list) 
         channelToClient5 = grpc.insecure_channel('client5:50056', options=(('grpc.enable_http_proxy', 0),))
         stubToClient5= sudoku_pb2_grpc.SecureMessagingStub(channelToClient5)
 
@@ -1344,15 +1373,6 @@ def client8serve():
 
         channelToClient9 = grpc.insecure_channel('client9:50060', options=(('grpc.enable_http_proxy', 0),))
         stubToClient9= sudoku_pb2_grpc.SecureMessagingStub(channelToClient9)
-    except :
-        sleep(1)
-
-    
-
-
-    
-    try:
-
         while unsolved:
 
             #request token from server
@@ -1369,28 +1389,31 @@ def client8serve():
               
                
                 responseFromClient5 = stubToClient5.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient5.dst, "recieving sub sudoku from", responseFromClient5.src)
+                print(responseFromClient5.dst, "requested", responseFromClient5.src)
                 c5row0 = responseFromClient5.subrow0[:]
                 c5row1 = responseFromClient5.subrow1[:]
                 c5row2 = responseFromClient5.subrow2[:]
                 print( "",c5row0,"\n",c5row1,"\n",c5row2)
 
                 responseFromClient7 = stubToClient7.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient7.dst, "recieving sub sudoku from", responseFromClient7.src)
+                print(responseFromClient7.dst, "requested", responseFromClient7.src)
                 c7row0 = responseFromClient7.subrow0[:]
                 c7row1 = responseFromClient7.subrow1[:]
                 c7row2 = responseFromClient7.subrow2[:]
                 print( "",c7row0,"\n",c7row1,"\n",c7row2)
 
                 responseFromClient9 = stubToClient9.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient9.dst, "recieving sub sudoku from", responseFromClient9.src)
+                print(responseFromClient9.dst, "requested", responseFromClient9.src)
                 c9row0 = responseFromClient9.subrow0[:]
                 c9row1 = responseFromClient9.subrow1[:]
                 c9row2 = responseFromClient9.subrow2[:]
                 print( "",c9row0,"\n",c9row1,"\n",c9row2)
                 
-
-
+    try:
+        while True:
+            #print("server running")
+            #time.sleep(sleepseconds)
+            pass
 
     except KeyboardInterrupt:
         print("keyboardinterrupt")
@@ -1434,7 +1457,7 @@ def client9serve():
             if request.position ==  "client6" or "client8" :
                 response.src = source
                 response.dst = request.position
-                print(response.src, "sending matrix to ", request.position)
+                print(request.position, "requested matrix from ",response.src )
                 #subsudoku = pandas_board.iloc[0:3,0:3].values.tolist()
                 del response.subrow0[:]
                 del response.subrow1[:]
@@ -1467,8 +1490,7 @@ def client9serve():
     encryptedMessage = encrypt(n,e,source)
     
     print(source + " sending encrypted message " + encryptedMessage + " to " + destination)
-    for i in range(10):
-            newresponse = stubToServer.SendEncryptedMessage(sudoku_pb2.EncryptedMessage(message=encryptedMessage, src = source, dst = destination))
+    newresponse = stubToServer.SendEncryptedMessage(sudoku_pb2.EncryptedMessage(message=encryptedMessage, src = source, dst = destination))
     if newresponse.status ==1 and newresponse.src == source and newresponse.dst == destination:
             print(source + " recieved acknoledgement from " +destination)
     
@@ -1487,22 +1509,16 @@ def client9serve():
     #print(type(response.subrow0[:]) )
 
 
-    #create a communication channel to client6 8
-    
-    try:
+    neighb_response = stubToServer.isMyNeighboursActive(sudoku_pb2.Address(position= source ))
+
+    if not(neighb_response.N_list == []):
+        print("neighbours are",neighb_response.N_list)
         channelclient6 = grpc.insecure_channel('client6:50057', options=(('grpc.enable_http_proxy', 0),))
         stubToClient6 = sudoku_pb2_grpc.SecureMessagingStub(channelclient6)
 
         channelclient8 = grpc.insecure_channel('client8:50059', options=(('grpc.enable_http_proxy', 0),))
         stubToClient8 = sudoku_pb2_grpc.SecureMessagingStub(channelclient8)
-    except :
-        sleep(1)
 
-
-
-
-    
-    try:
         while unsolved :
 
             #request token from server
@@ -1518,20 +1534,24 @@ def client9serve():
             if hasToken:
                
                 responseFromClient6 = stubToClient6.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient6.dst, "recieving sub sudoku from", responseFromClient6.src)
+                print(responseFromClient6.dst, "requested", responseFromClient6.src)
                 c6row0 = responseFromClient6.subrow0[:]
                 c6row1 = responseFromClient6.subrow1[:]
                 c6row2 = responseFromClient6.subrow2[:]
                 print( "",c6row0,"\n",c6row1,"\n",c6row2)
 
                 responseFromClient8 = stubToClient8.GetSubMatrix(sudoku_pb2.Address(position= source ))
-                print(responseFromClient8.dst, "recieving sub sudoku from", responseFromClient8.src)
+                print(responseFromClient8.dst, "requested", responseFromClient8.src)
                 c8row0 = responseFromClient8.subrow0[:]
                 c8row1 = responseFromClient8.subrow1[:]
                 c8row2 = responseFromClient8.subrow2[:]
                 print( "",c8row0,"\n",c8row1,"\n",c8row2)
 
-
+    try:
+        while True:
+            #print("server running")
+            #time.sleep(sleepseconds)
+            pass
 
     except KeyboardInterrupt:
         print("keyboardinterrupt")

@@ -16,6 +16,9 @@ service SecureMessaging {
   // Recieves a round robin token
   rpc GetRoundRobinToken(Address) returns (Token) {}
 
+  //check if all my neighbours are active
+  rpc isMyNeighboursActive(Address) returns (Neighbor){}
+
 }
 
 message PublicKey {
@@ -23,6 +26,9 @@ message PublicKey {
   int32 e = 2;
 }
 
+message Neighbor {
+  repeated string N_list = 1 ;
+}
 
 
 message subMatrix {
