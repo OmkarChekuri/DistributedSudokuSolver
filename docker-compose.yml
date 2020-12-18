@@ -1,0 +1,98 @@
+version: '3.7'
+
+services:
+  server:
+    build: .
+    environment:
+      - TZ=American/Chicago
+      - DEBIAN_FRONTEND=noninteractive
+    hostname: server
+    container_name: server
+    networks:
+      - default
+  client1:
+    build: .
+    environment:
+      - TZ=American/Chicago
+      - DEBIAN_FRONTEND=noninteractive
+    hostname: client1
+    container_name: client1
+    networks:
+      - default
+  client2:
+    build: .
+    environment:
+      - TZ=American/Chicago
+      - DEBIAN_FRONTEND=noninteractive
+    hostname: client2
+    container_name: client2
+    networks:
+      - default
+
+  client3:
+    build: .
+    environment:
+      - TZ=American/Chicago
+      - DEBIAN_FRONTEND=noninteractive
+    hostname: client3
+    container_name: client3
+    networks:
+      - default
+  client4:
+    build: .
+    environment:
+      - TZ=American/Chicago
+      - DEBIAN_FRONTEND=noninteractive
+    hostname: client4
+    container_name: client4
+    networks:
+      - default
+  client5:
+    build: .
+    environment:
+      - TZ=American/Chicago
+      - DEBIAN_FRONTEND=noninteractive
+    hostname: client5
+    container_name: client5
+    networks:
+      - default
+  client6:
+    build: .
+    environment:
+      - TZ=American/Chicago
+      - DEBIAN_FRONTEND=noninteractive
+    hostname: client6
+    container_name: client6
+    networks:
+      - default
+  client7:
+    build: .
+    environment:
+      - TZ=American/Chicago
+      - DEBIAN_FRONTEND=noninteractive
+    hostname: client7
+    container_name: client7
+    networks:
+      - default
+  client8:
+    build: .
+    environment:
+      - TZ=American/Chicago
+      - DEBIAN_FRONTEND=noninteractive
+    hostname: client8
+    container_name: client8
+    networks:
+      - default
+  client9:
+    build: .
+    environment:
+      - TZ=American/Chicago
+      - DEBIAN_FRONTEND=noninteractive
+    hostname: client9
+    container_name: client9
+    networks:
+      - default
+
+networks:
+  default:
+    driver: bridge

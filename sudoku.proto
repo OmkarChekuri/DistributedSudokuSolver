@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package ousystems;
+
+service SecureMessaging {
+
+  // Requests and returns the Public Key
+  rpc GetPublicKey (NullMsg) returns (PublicKey) {}
+  
+  // Receives an Encrypt a message
+  rpc SendEncryptedMessage (EncryptedMessage) returns (MsgAck) {}
+
+  // Recieves a subset sudoku
+  rpc GetSubMatrix(Address) returns (subMatrix) {}
+
+  // Recieves a round robin token
+  rpc GetRoundRobinToken(Address) returns (Token) {}
+
+}
+
+message PublicKey {
+  int32 n = 1;
+  int32 e = 2;
+}
+
+
+
+message subMatrix {
+
+    repeated int32 subrow0 = 1 ;
+    repeated int32 subrow1 = 2 ;
+    repeated int32 subrow2 = 3 ;
+    string src = 4;
+    string dst = 5;
+
+}
+
+message EncryptedMessage {
+  // Integer representing encrypted message
+  string message = 1;
+  string src = 2;
+  string dst = 3;
+}
+
+// Return this acknowledging the receipt of a message
+message MsgAck {
+  int32 status = 1;
+  string src = 2;
+  string dst = 3;
+}
+
+// Empty Message Type
+message NullMsg {
+  int32 status = 1;
+} 
+
+// Address Message Type
+message Address {
+  string position = 1;
+} 
+
+//Round Robin Token
+message Token {
+  int32 timeslot = 1;
+}

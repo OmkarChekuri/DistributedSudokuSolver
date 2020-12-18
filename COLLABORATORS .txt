@@ -1,0 +1,7 @@
+Christan Grant, cgrant@ou.edu, Helped me understand gRPC, Docker, explained me rsa algorithm and provided boiler plate code 
+https://grpc.io/docs/languages/python/basics/  Help with gRPC
+https://www.youtube.com/watch?v=GwKz4LGeWiI, Help with gRPC
+https://grpc.io/docs/languages/python/quickstart/ , Help with gRPC
+https://rtfm.co.ua/en/docker-configure-tzdata-and-timezone-during-build/, help with timezone error.
+https://developers.google.com/protocol-buffers/docs/reference/python-generated?csw=1#repeated-fields, help with repeated fields
+https://www.sciencedirect.com/topics/computer-science/round-robin-scheduling , help with studying about the variations of round robin scheduling algorithm
